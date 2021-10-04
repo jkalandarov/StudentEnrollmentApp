@@ -18,9 +18,6 @@ const knex = require('knex')({
 
 app.use(express.json())
 
-app.get('/', (req, res)=>{
-    res.json('Successful')
-})
 /* ====== FUNCTIONS ====== */
 //Send email for new users
 const sendEmail =(email)=>{
@@ -57,16 +54,39 @@ const enroll_course = ({object}) =>{
 
 /*===========================================*/
 
+app.get('/', (req, res)=>{
+    res.json('Successful')
+})
 //Student registration
 app.post('/register', (req, res)=>{
-    const {...registration_data} = req.body
-    console.log(registration_data);
+    const { first_name, last_name, username, user_password, date_of_birth, country, province, city, address, email, } = req.body
 
-    knex('users').insert(registration_data)
-    .then((result)=>{
-        console.log(result)
-    })
-    .then(sendEmail(result.email))
+	let is_valid = true;
+	if(!(firstname && typeof firstname === 'string')) is_valid = false;
+
+	if(!is_valid){
+		return res.json({
+			error: true,
+			response: 'invalid form data!'
+		})
+	}
+
+    console.log(req.body);
+
+    const response = await knex('users').insert({ first_name, last_name, username, user_password, date_of_birth, country, province, city, address, email})
+
+	if(!response.error){
+		sendEmail(email)
+		return res.json({
+			error: false,
+			response: 'success!'
+		})
+	} else {
+		return res.json({
+			error: true,
+			response: response.error
+		})
+	}
 })
 
 //Login
@@ -75,12 +95,14 @@ app.get('/login', (req, res)=>{
 })
 
 app.post('/login', async (req, res)=>{
-    const {...login_data} = req.body
-    console.log(login_data)
+    const { email, user_password } = req.body
+    
     try {
-        if (await checkUser(login_data.email, login_data.user_password)){
-            res.redirect('/login')
-        } 
+        const data = await knex('users').where({email: email, user_password: user_password}).first().then(row => row)
+        console.log(data)
+        if (data.length != 0){
+            res.redirect('/account/:id')
+        }
     } catch (error) {
         console.error(error.message)
     }
@@ -100,9 +122,7 @@ app.get('/verification/:user_id', (req, res)=>{
 
 
 //Enroll
-app.post('/enroll', async(req, res)=>{
-    // const enroll_data = req.body
-    // console.log(enroll_data);
+app.post('/account/:id/enroll', async(req, res)=>{
 
     const mapped_data = req.body.courses.map(course => ({
         ...course, 
